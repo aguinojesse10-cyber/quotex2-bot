@@ -5,9 +5,8 @@ import pandas as pd
 import numpy as np
 
 # ================= CONFIGURAÇÕES DO TELEGRAM =================
-# Substitui pelos teus dados corretos se necessário
-TOKEN = "O_TEU_TOKEN_DO_TELEGRAM"
-CHAT_ID = "O_TEU_CHAT_ID"
+TOKEN = "7950796339:AAESd5H2HlJmFfS5X2w4p7k1L8m9N0v3Q2w"
+CHAT_ID = "6172559092"
 
 def enviar_telegram(mensagem):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -144,4 +143,3 @@ def monitorizar_mercado():
 
 if __name__ == "__main__":
     monitorizar_mercado()
-    
