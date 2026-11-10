@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot Quotex 1M Online!"
+    return "Bot Quotex 1M Online com Pré-Alerta!"
 
 def correr_flask():
     port = int(os.environ.get('PORT', 10000))
@@ -42,6 +42,9 @@ TODOS_ATIVOS = [
     "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD"
 ]
 
+# Dicionário para controlar os pré-alertas e evitar spam no mesmo ativo
+estado_pre_alerta = {}
+
 def calcular_indicadores(df):
     df['EMA_9'] = df['close'].ewm(span=9, adjust=False).mean()
     df['EMA_21'] = df['close'].ewm(span=21, adjust=False).mean()
@@ -60,8 +63,8 @@ def calcular_indicadores(df):
     return df
 
 def monitorizar_mercado():
-    print(">>> BOT INICIADO COM SUCESSO <<<", flush=True)
-    enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado 24/7.")
+    print(">>> BOT INICIADO COM SUCESSO (COM PRÉ-ALERTA) <<<", flush=True)
+    enviar_telegram("🤖 *Bot Quotex 1M Online!* Sistema de Pré-Alerta ativado para eliminar o delay.")
     
     while True:
         try:
@@ -96,11 +99,43 @@ def monitorizar_mercado():
                     
                     casas = 5 if "=X" in ticker else 2
 
-                    # Lógica de Compra
-                    if rsi <= 46 and ema9 > ema21 and macd_hist > 0:
+                    # Chave única para o ativo no controle de pré-alerta
+                    if ticker not in estado_pre_alerta:
+                        estado_pre_alerta[ticker] = None
+
+                    # ---------------------------------------------------------
+                    # 1. LÓGICA DE PRÉ-ALERTA (Aviso Prévio)
+                    # ---------------------------------------------------------
+                    # Pré-alerta de Compra (RSI a aproximar-se de 40)
+                    if 41 <= rsi <= 43 and ema9 > ema21 and estado_pre_alerta[ticker] != 'COMPRA':
+                        msg_pre = (
+                            f"⚠️ *PREPARA O PAR - COMPRA*\n\n"
+                            f"📊 Ativo: `{nome_quotex}`\n"
+                            f"📈 RSI Próximo da Zona: `{rsi:.1f}`\n"
+                            f"👉 *Abre o gráfico na Quotex, o sinal pode vir na próxima vela!*"
+                        )
+                        enviar_telegram(msg_pre)
+                        estado_pre_alerta[ticker] = 'COMPRA'
+
+                    # Pré-alerta de Venda (RSI a aproximar-se de 60)
+                    elif 57 <= rsi <= 59 and ema9 < ema21 and estado_pre_alerta[ticker] != 'VENDA':
+                        msg_pre = (
+                            f"⚠️ *PREPARA O PAR - VENDA*\n\n"
+                            f"📊 Ativo: `{nome_quotex}`\n"
+                            f"📉 RSI Próximo da Zona: `{rsi:.1f}`\n"
+                            f"👉 *Abre o gráfico na Quotex, o sinal pode vir na próxima vela!*"
+                        )
+                        enviar_telegram(msg_pre)
+                        estado_pre_alerta[ticker] = 'VENDA'
+
+                    # ---------------------------------------------------------
+                    # 2. LÓGICA DE SINAL DEFINITIVO (Com os filtros rigorosos)
+                    # ---------------------------------------------------------
+                    # Sinal de Compra
+                    if rsi <= 40 and ema9 > ema21 and macd_hist > 0.00005:
                         resultado = "✅ GREEN (WIN)" if preco_seguinte > preco else "❌ RED (LOSS)"
                         msg = (
-                            f"🟢 *ENTRADA PERFEITA - COMPRA (CALL)*\n\n"
+                            f"🟢 *ENTRADA DE ALTA PRECISÃO - COMPRA (CALL)*\n\n"
                             f"📊 Ativo: `{nome_quotex}`\n"
                             f"⏰ Entrada: *PRÓXIMA VELA (Abertura)*\n"
                             f"⏳ Expiração: *1 MINUTO (M1)*\n"
@@ -109,12 +144,13 @@ def monitorizar_mercado():
                             f"🏁 Resultado: *{resultado}*"
                         )
                         enviar_telegram(msg)
+                        estado_pre_alerta[ticker] = None # Reseta o estado após o sinal
 
-                    # Lógica de Venda
-                    elif rsi >= 54 and ema9 < ema21 and macd_hist < 0:
+                    # Sinal de Venda
+                    elif rsi >= 60 and ema9 < ema21 and macd_hist < -0.00005:
                         resultado = "✅ GREEN (WIN)" if preco_seguinte < preco else "❌ RED (LOSS)"
                         msg = (
-                            f"🔴 *ENTRADA PERFEITA - VENDA (PUT)*\n\n"
+                            f"🔴 *ENTRADA DE ALTA PRECISÃO - VENDA (PUT)*\n\n"
                             f"📊 Ativo: `{nome_quotex}`\n"
                             f"⏰ Entrada: *PRÓXIMA VELA (Abertura)*\n"
                             f"⏳ Expiração: *1 MINUTO (M1)*\n"
@@ -123,7 +159,12 @@ def monitorizar_mercado():
                             f"🏁 Resultado: *{resultado}*"
                         )
                         enviar_telegram(msg)
+                        estado_pre_alerta[ticker] = None # Reseta o estado após o sinal
                     
+                    # Se o mercado afastar-se das zonas, limpa o pré-alerta para permitir novo aviso no futuro
+                    elif 45 < rsi < 55:
+                        estado_pre_alerta[ticker] = None
+
                     time.sleep(1)
                 except Exception as e:
                     continue
@@ -138,4 +179,3 @@ if __name__ == "__main__":
     t_flask.start()
     
     monitorizar_mercado()
-    
