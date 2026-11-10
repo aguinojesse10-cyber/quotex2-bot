@@ -18,9 +18,9 @@ def correr_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Credenciais do Telegram atualizadas
+# Credenciais do Telegram corretas e validadas
 TOKEN = "9160642609:AAETghLIx8PbcWOe7YfSFe411MKmcYIABcY"
-CHAT_ID = "6172559092"
+CHAT_ID = "9005778571"
 
 def enviar_telegram(mensagem):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -131,3 +131,4 @@ if __name__ == "__main__":
     t_flask.start()
     
     monitorizar_mercado()
+    
