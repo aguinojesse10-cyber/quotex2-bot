@@ -3,9 +3,9 @@ import pandas as pd
 import yfinance as yf
 
 # Configuração da página otimizada para telemóvel
-st.set_page_config(page_title="Painel Quotex 1M", layout="centered")
+st.set_page_config(page_title="Scanner Perfeito Quotex 1M", layout="centered")
 
-# Script para recarregar a página automaticamente a cada 30 segundos
+# Atualização automática a cada 30 segundos
 st.markdown(
     """
     <meta http-equiv="refresh" content="30">
@@ -13,44 +13,35 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Barra lateral para controlos e personalização dinâmica
 st.sidebar.title("⚙️ Configurações")
 st.sidebar.markdown("🔄 **Auto-Refresh:** A cada 30s")
-
-# Lista completa de pares populares de Forex (Quotex) e Cripto
-todos_ativos = [
-    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", 
-    "USDCAD=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", 
-    "GBPJPY=X", "AUDJPY=X", "BTC-USD", "ETH-USD", 
-    "SOL-USD", "XRP-USD", "ADA-USD", "DOGE-USD"
-]
-
-# Multiselect dinâmico para o utilizador escolher o que quer ver
-ativos_selecionados = st.sidebar.multiselect(
-    "Escolha os Ativos a Analisar:",
-    options=todos_ativos,
-    default=["EURUSD=X", "GBPUSD=X", "USDJPY=X", "BTC-USD", "ETH-USD"]
-)
-
 modo_compacto = st.sidebar.checkbox("Modo Flutuante / Compacto", value=True)
 
 if modo_compacto:
     st.markdown("""
         <style>
             .block-container { padding-top: 1rem; padding-bottom: 1rem; padding-left: 0.5rem; padding-right: 0.5rem; }
-            h1 { font-size: 1.4rem !important; }
+            h1 { font-size: 1.3rem !important; }
             h3 { font-size: 1rem !important; }
         </style>
     """, unsafe_allow_html=True)
 
-st.title("⚡ Painel Dinâmico 1M - Quotex")
-st.caption("Análise técnica em tempo real para velas de 1 minuto.")
+st.title("⚡ Scanner de Oportunidades 1M")
+st.caption("A varrer o mercado em tempo real em busca de entradas perfeitas.")
+
+# Lista abrangente de pares Forex globais e Cripto
+todos_ativos = [
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", 
+    "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", 
+    "CHFJPY=X", "EURCHF=X", "AUDCAD=X", "EURAUD=X", "GBPCAD=X",
+    "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD"
+]
 
 @st.cache_data(ttl=20)
 def carregar_dados(ticker):
     try:
         df = yf.download(ticker, period="1d", interval="1m", progress=False)
-        if df.empty:
+        if df.empty or len(df) < 30:
             return None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -81,41 +72,60 @@ def calcular_indicadores(df):
     
     return df
 
-st.markdown("---")
+# Listas para separar os ativos encontrados
+oportunidades = []
+outros_analisados = []
 
-if not ativos_selecionados:
-    st.warning("⚠️ Selecione pelo menos um ativo na barra lateral para ver as análises.")
+for ticker in todos_ativos:
+    df = carregar_dados(ticker)
+    if df is None:
+        continue
+        
+    df = calcular_indicadores(df)
+    ultimo = df.iloc[-1]
+    
+    preco = float(ultimo['close'])
+    rsi = float(ultimo['RSI'])
+    ema9 = float(ultimo['EMA_9'])
+    ema21 = float(ultimo['EMA_21'])
+    macd_hist = float(ultimo['MACD_Hist'])
+    
+    casas = 5 if "=X" in ticker else 2
+    nome_quotex = ticker.replace("-USD", "/USD").replace("=X", "")
+    if len(nome_quotex) == 6 and "/" not in nome_quotex:
+        nome_quotex = nome_quotex[:3] + "/" + nome_quotex[3:]
+
+    # Critério de Entrada Perfeita (Filtro Rigoroso de Tendência e Momentum)
+    # Compra: RSI < 45 (sobrevendido leve / zona de arranque), EMA9 > EMA21, MACD positivo forte
+    if rsi <= 46 and ema9 > ema21 and macd_hist > 0:
+        status = "🟢 ENTRADA PERFEITA - COMPRA (CALL)"
+        oportunidades.append((nome_quotex, preco, rsi, macd_hist, casas, status))
+    # Venda: RSI > 54 (sobrecomprado leve / zona de queda), EMA9 < EMA21, MACD negativo forte
+    elif rsi >= 54 and ema9 < ema21 and macd_hist < 0:
+        status = "🔴 ENTRADA PERFEITA - VENDA (PUT)"
+        oportunidades.append((nome_quotex, preco, rsi, macd_hist, casas, status))
+    else:
+        outros_analisados.append((nome_quotex, preco, rsi, macd_hist, casas, "⚪ Neutro / Aguardar"))
+
+# SECÇÃO DE DESTAQUE: Oportunidades Perfeitas
+st.subheader("🎯 Oportunidades Perfeitas (1M)")
+if len(oportunidades) == 0:
+    st.info("🔍 A varrer o mercado... Nenhum par atingiu o gatilho perfeito neste exato minuto. Aguarde a próxima atualização (30s).")
 else:
-    for ticker in ativos_selecionados:
-        df = carregar_dados(ticker)
-        if df is None or len(df) < 30:
-            continue
-            
-        df = calcular_indicadores(df)
-        ultimo = df.iloc[-1]
-        
-        preco = float(ultimo['close'])
-        rsi = float(ultimo['RSI'])
-        ema9 = float(ultimo['EMA_9'])
-        ema21 = float(ultimo['EMA_21'])
-        macd_hist = float(ultimo['MACD_Hist'])
-        
-        casas = 5 if "=X" in ticker else 2
-        nome_quotex = ticker.replace("-USD", "/USD").replace("=X", "")
-        if len(nome_quotex) == 6 and "/" not in nome_quotex:
-            nome_quotex = nome_quotex[:3] + "/" + nome_quotex[3:]
-
-        # Lógica de sinais 1M
-        if rsi < 48 and ema9 > ema21 and macd_hist > 0:
-            status = "🟢 COMPRA (CALL)"
-        elif rsi > 52 and ema9 < ema21 and macd_hist < 0:
-            status = "🔴 VENDA (PUT)"
-        else:
-            status = "⚪ NEUTRO"
-
-        st.subheader(f"📊 {nome_quotex}")
+    for item in oportunidades:
+        nome, preco, rsi, macd_hist, casas, status = item
         st.markdown(f"""
-        * Preço: `{preco:.{casas}f}` | Sinal: **{status}**
-        * RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`
+        ### {nome}
+        * **Sinal:** **{status}**
+        * **Preço Atual:** `{preco:.{casas}f}`
+        * **RSI:** `{rsi:.1f}` | **MACD Hist:** `{macd_hist:.{casas}f}`
         """)
         st.markdown("---")
+
+# SECÇÃO SECUNDÁRIA: Restantes Pares Monitorizados
+st.subheader("📊 Demais Pares Analisados")
+for item in outros_analisados:
+    nome, preco, rsi, macd_hist, casas, status = item
+    st.markdown(f"""
+    * **{nome}** — Preço: `{preco:.{casas}f}` | RSI: `{rsi:.1f}` | *{status}*
+    """)
