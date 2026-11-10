@@ -18,8 +18,8 @@ def correr_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Credenciais do Telegram atualizadas
-TOKEN = "9253894531:AAH5aGX58RSiblErf_dRrll5zxCoq3FXdvO"
+# Credenciais do Telegram atualizadas e válidas
+TOKEN = "9253894531:AAFptMPB8c6Yk5tNbdMxPczOw9bkdix0wso"
 CHAT_ID = "6172559092"
 
 def enviar_telegram(mensagem):
@@ -131,3 +131,4 @@ if __name__ == "__main__":
     t_flask.start()
     
     monitorizar_mercado()
+    
