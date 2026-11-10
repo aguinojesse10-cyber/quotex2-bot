@@ -1,12 +1,35 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
+import time
 
-# Configuração da página para ficar otimizada no telemóvel
+# Configuração da página otimizada para telemóvel
 st.set_page_config(page_title="Painel Quotex 1M", layout="centered")
 
-st.title("⚡ Painel de Sinais 1M - Quotex")
-st.markdown("Monitorização em tempo real de Cripto e Forex para velas de 1 minuto.")
+# Script para recarregar a página automaticamente a cada 30 segundos (30000 milissegundos)
+st.markdown(
+    """
+    <meta http-equiv="refresh" content="30">
+    """,
+    unsafe_allow_html=True
+)
+
+# Barra lateral para controlos rápidos
+st.sidebar.title("⚙️ Controlos")
+st.sidebar.markdown("🔄 **Auto-Refresh:** Ativo (a cada 30s)")
+modo_compacto = st.sidebar.checkbox("Modo Flutuante / Compacto", value=True, help="Reduz espaços para facilitar o ecrã dividido")
+
+if modo_compacto:
+    st.markdown("""
+        <style>
+            .block-container { padding-top: 1rem; padding-bottom: 1rem; padding-left: 0.5rem; padding-right: 0.5rem; }
+            h1 { font-size: 1.4rem !important; }
+            h3 { font-size: 1rem !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
+st.title("⚡ Painel 1M - Quotex")
+st.caption("Atualiza automaticamente a cada 30 segundos.")
 
 # Lista de ativos
 ativos = [
@@ -14,7 +37,7 @@ ativos = [
     "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"
 ]
 
-@st.cache_data(ttl=30) # Atualiza os dados a cada 30 segundos automaticamente
+@st.cache_data(ttl=20)
 def carregar_dados(ticker):
     try:
         df = yf.download(ticker, period="1d", interval="1m", progress=False)
@@ -49,13 +72,8 @@ def calcular_indicadores(df):
     
     return df
 
-# Botão para forçar a atualização manual do mercado
-if st.button("🔄 Atualizar Mercado Agora"):
-    st.cache_data.clear()
-
 st.markdown("---")
 
-# Varre e mostra o painel de cada ativo em tempo real
 for ticker in ativos:
     df = carregar_dados(ticker)
     if df is None or len(df) < 30:
@@ -75,20 +93,16 @@ for ticker in ativos:
     if len(nome_quotex) == 6 and "/" not in nome_quotex:
         nome_quotex = nome_quotex[:3] + "/" + nome_quotex[3:]
 
-    # Analisa a tendência para velas de 1 minuto
     if rsi < 48 and ema9 > ema21 and macd_hist > 0:
         status = "🟢 COMPRA (CALL)"
     elif rsi > 52 and ema9 < ema21 and macd_hist < 0:
         status = "🔴 VENDA (PUT)"
     else:
-        status = "⚪ NEUTRO / AGUARDAR"
+        status = "⚪ NEUTRO"
 
-    # Exibe o card visual limpo para o telemóvel
     st.subheader(f"📊 {nome_quotex}")
     st.markdown(f"""
-    * **Preço:** `{preco:.{casas}f}`
-    * **Sinal 1M:** **{status}**
-    * **RSI:** `{rsi:.2f}` | **MACD:** `{macd_hist:.{casas}f}`
-    * **Expiração Sugerida:** `1 a 3 minutos`
+    * Preço: `{preco:.{casas}f}` | Sinal: **{status}**
+    * RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`
     """)
     st.markdown("---")
