@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from flask import Flask
 
-# 1. Servidor Flask (para manter o Render acordado)
+# Servidor Flask para manter o Render acordado
 app = Flask(__name__)
 
 @app.route('/')
@@ -18,7 +18,7 @@ def correr_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# 2. Credenciais do Telegram
+# Credenciais do Telegram
 TOKEN = "7950796339:AAESd5H2HlJmFfS5X2w4p7k1L8m9N0v3Q2w"
 CHAT_ID = "6172559092"
 
@@ -30,9 +30,10 @@ def enviar_telegram(mensagem):
         "parse_mode": "Markdown"
     }
     try:
-        requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
+        print(f"Telegram Status: {response.status_code} | Resposta: {response.text}", flush=True)
     except Exception as e:
-        print(f"Erro Telegram: {e}")
+        print(f"Erro crítico no Telegram: {e}", flush=True)
 
 TODOS_ATIVOS = [
     "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", 
@@ -58,9 +59,8 @@ def calcular_indicadores(df):
     df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
     return df
 
-# 3. Rotina Principal do Bot
 def monitorizar_mercado():
-    print("Bot iniciado na nuvem.")
+    print(">>> BOT INICIADO NA NUVEM COM SUCESSO <<<", flush=True)
     enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado 24/7.")
     
     while True:
@@ -121,14 +121,14 @@ def monitorizar_mercado():
                 
                 time.sleep(1)
             except Exception as e:
+                print(f"Erro ao analisar {ticker}: {e}", flush=True)
                 continue
         time.sleep(15)
 
 if __name__ == "__main__":
-    # Inicia o Flask numa thread em segundo plano para não bloquear o bot
     t_flask = threading.Thread(target=correr_flask)
     t_flask.daemon = True
     t_flask.start()
     
-    # Inicia imediatamente a monitorização e o envio de mensagens
     monitorizar_mercado()
+    
