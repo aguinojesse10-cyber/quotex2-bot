@@ -1,8 +1,20 @@
 import time
+import threading
 import requests
 import yfinance as yf
 import pandas as pd
 import numpy as np
+from flask import Flask
+
+# ================= SERVIDOR WEB PARA O RENDER NÃO ADORMECER =================
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot Quotex 1M a funcionar a todo o vapor!"
+
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
 
 # ================= CONFIGURAÇÕES DO TELEGRAM =================
 TOKEN = "7950796339:AAESd5H2HlJmFfS5X2w4p7k1L8m9N0v3Q2w"
@@ -52,7 +64,7 @@ def calcular_indicadores(df):
 
 def monitorizar_mercado():
     print("🤖 Bot Quotex 1M iniciado com sucesso na nuvem.")
-    enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado em tempo real.")
+    enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado 24/7.")
     
     while True:
         for ticker in TODOS_ATIVOS:
@@ -72,7 +84,6 @@ def monitorizar_mercado():
                 
                 df = calcular_indicadores(df)
                 
-                # Analisamos a penúltima vela (fechada) e a última (para validar resultado)
                 anterior = df.iloc[-2]
                 atual = df.iloc[-1]
                 
@@ -90,7 +101,7 @@ def monitorizar_mercado():
                 
                 casas = 5 if "=X" in ticker else 2
 
-                # ================= LÓGICA DE ENTRADA (Igual ao Painel) =================
+                # ================= LÓGICA DE ENTRADA =================
                 # COMPRA (CALL)
                 if rsi <= 46 and ema9 > ema21 and macd_hist > 0:
                     resultado = "✅ GREEN (WIN)" if preco_seguinte > preco else "❌ RED (LOSS)"
@@ -100,7 +111,7 @@ def monitorizar_mercado():
                         f"📊 Ativo: `{nome_quotex}`\n"
                         f"💵 Preço Entrada: `{preco:.{casas}f}`\n"
                         f"📈 RSI: `{rsi:.1f}` | MACD Hist: `{macd_hist:.{casas}f}`\n"
-                        f"🏁 Resultado (Vela Seguintel): *{resultado}*"
+                        f"🏁 Resultado (Vela Seguinte): *{resultado}*"
                     )
                     enviar_telegram(mensagem)
                     print(f"Sinal de COMPRA detetado em {nome_quotex} -> Enviado para o Telegram.")
@@ -125,8 +136,13 @@ def monitorizar_mercado():
                 print(f"Erro ao analisar {ticker}: {e}")
                 continue
         
-        # Pausa antes da próxima ronda de varredura completa
         time.sleep(15)
 
 if __name__ == "__main__":
+    # Inicia o servidor Flask numa thread separada para o Render aceitar o deploy
+    t = threading.Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+    
+    # Inicia a rotina de monitorização do mercado
     monitorizar_mercado()
