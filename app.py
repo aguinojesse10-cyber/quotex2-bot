@@ -92,4 +92,4 @@ st.markdown("### 📊 Demais Pares Analisados")
 # Secção resumida para mostrar que os outros pares estão a ser validados
 for par in PARES:
     nome_ativo = par.replace("=X", "").replace("-USD", "/USD")
-    st.write(- f"• **{nome_ativo}** — Estado: A monitorizar")
+    st.write(f"• **{nome_ativo}** — Estado: A monitorizar")
