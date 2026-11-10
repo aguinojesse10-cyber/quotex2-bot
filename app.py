@@ -1,12 +1,11 @@
 import streamlit as st
 import pandas as pd
 import yfinance as yf
-import time
 
 # Configuração da página otimizada para telemóvel
 st.set_page_config(page_title="Painel Quotex 1M", layout="centered")
 
-# Script para recarregar a página automaticamente a cada 30 segundos (30000 milissegundos)
+# Script para recarregar a página automaticamente a cada 30 segundos
 st.markdown(
     """
     <meta http-equiv="refresh" content="30">
@@ -14,10 +13,26 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Barra lateral para controlos rápidos
-st.sidebar.title("⚙️ Controlos")
-st.sidebar.markdown("🔄 **Auto-Refresh:** Ativo (a cada 30s)")
-modo_compacto = st.sidebar.checkbox("Modo Flutuante / Compacto", value=True, help="Reduz espaços para facilitar o ecrã dividido")
+# Barra lateral para controlos e personalização dinâmica
+st.sidebar.title("⚙️ Configurações")
+st.sidebar.markdown("🔄 **Auto-Refresh:** A cada 30s")
+
+# Lista completa de pares populares de Forex (Quotex) e Cripto
+todos_ativos = [
+    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", 
+    "USDCAD=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", 
+    "GBPJPY=X", "AUDJPY=X", "BTC-USD", "ETH-USD", 
+    "SOL-USD", "XRP-USD", "ADA-USD", "DOGE-USD"
+]
+
+# Multiselect dinâmico para o utilizador escolher o que quer ver
+ativos_selecionados = st.sidebar.multiselect(
+    "Escolha os Ativos a Analisar:",
+    options=todos_ativos,
+    default=["EURUSD=X", "GBPUSD=X", "USDJPY=X", "BTC-USD", "ETH-USD"]
+)
+
+modo_compacto = st.sidebar.checkbox("Modo Flutuante / Compacto", value=True)
 
 if modo_compacto:
     st.markdown("""
@@ -28,14 +43,8 @@ if modo_compacto:
         </style>
     """, unsafe_allow_html=True)
 
-st.title("⚡ Painel 1M - Quotex")
-st.caption("Atualiza automaticamente a cada 30 segundos.")
-
-# Lista de ativos
-ativos = [
-    "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD",
-    "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X"
-]
+st.title("⚡ Painel Dinâmico 1M - Quotex")
+st.caption("Análise técnica em tempo real para velas de 1 minuto.")
 
 @st.cache_data(ttl=20)
 def carregar_dados(ticker):
@@ -74,35 +83,39 @@ def calcular_indicadores(df):
 
 st.markdown("---")
 
-for ticker in ativos:
-    df = carregar_dados(ticker)
-    if df is None or len(df) < 30:
-        continue
+if not ativos_selecionados:
+    st.warning("⚠️ Selecione pelo menos um ativo na barra lateral para ver as análises.")
+else:
+    for ticker in ativos_selecionados:
+        df = carregar_dados(ticker)
+        if df is None or len(df) < 30:
+            continue
+            
+        df = calcular_indicadores(df)
+        ultimo = df.iloc[-1]
         
-    df = calcular_indicadores(df)
-    ultimo = df.iloc[-1]
-    
-    preco = float(ultimo['close'])
-    rsi = float(ultimo['RSI'])
-    ema9 = float(ultimo['EMA_9'])
-    ema21 = float(ultimo['EMA_21'])
-    macd_hist = float(ultimo['MACD_Hist'])
-    
-    casas = 5 if "=X" in ticker else 2
-    nome_quotex = ticker.replace("-USD", "/USD").replace("=X", "")
-    if len(nome_quotex) == 6 and "/" not in nome_quotex:
-        nome_quotex = nome_quotex[:3] + "/" + nome_quotex[3:]
+        preco = float(ultimo['close'])
+        rsi = float(ultimo['RSI'])
+        ema9 = float(ultimo['EMA_9'])
+        ema21 = float(ultimo['EMA_21'])
+        macd_hist = float(ultimo['MACD_Hist'])
+        
+        casas = 5 if "=X" in ticker else 2
+        nome_quotex = ticker.replace("-USD", "/USD").replace("=X", "")
+        if len(nome_quotex) == 6 and "/" not in nome_quotex:
+            nome_quotex = nome_quotex[:3] + "/" + nome_quotex[3:]
 
-    if rsi < 48 and ema9 > ema21 and macd_hist > 0:
-        status = "🟢 COMPRA (CALL)"
-    elif rsi > 52 and ema9 < ema21 and macd_hist < 0:
-        status = "🔴 VENDA (PUT)"
-    else:
-        status = "⚪ NEUTRO"
+        # Lógica de sinais 1M
+        if rsi < 48 and ema9 > ema21 and macd_hist > 0:
+            status = "🟢 COMPRA (CALL)"
+        elif rsi > 52 and ema9 < ema21 and macd_hist < 0:
+            status = "🔴 VENDA (PUT)"
+        else:
+            status = "⚪ NEUTRO"
 
-    st.subheader(f"📊 {nome_quotex}")
-    st.markdown(f"""
-    * Preço: `{preco:.{casas}f}` | Sinal: **{status}**
-    * RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`
-    """)
-    st.markdown("---")
+        st.subheader(f"📊 {nome_quotex}")
+        st.markdown(f"""
+        * Preço: `{preco:.{casas}f}` | Sinal: **{status}**
+        * RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`
+        """)
+        st.markdown("---")
