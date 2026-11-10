@@ -1,22 +1,25 @@
 import time
 import threading
+import os
 import requests
 import yfinance as yf
 import pandas as pd
 import numpy as np
 from flask import Flask
 
-# ================= SERVIDOR WEB PARA O RENDER NÃO ADORMECER =================
+# Servidor Flask básico para o Render detetar o serviço web
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot Quotex 1M a funcionar a todo o vapor!"
+    return "Bot Quotex 1M Online!"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=10000)
+    # O Render atribui dinamicamente a porta através de os.environ.get('PORT')
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
 
-# ================= CONFIGURAÇÕES DO TELEGRAM =================
+# Credenciais do Telegram
 TOKEN = "7950796339:AAESd5H2HlJmFfS5X2w4p7k1L8m9N0v3Q2w"
 CHAT_ID = "6172559092"
 
@@ -28,15 +31,10 @@ def enviar_telegram(mensagem):
         "parse_mode": "Markdown"
     }
     try:
-        response = requests.post(url, json=payload, timeout=10)
-        if response.status_code == 200:
-            print("Mensagem enviada com sucesso para o Telegram!")
-        else:
-            print(f"Erro ao enviar para o Telegram: {response.text}")
+        requests.post(url, json=payload, timeout=10)
     except Exception as e:
-        print(f"Exceção ao enviar mensagem: {e}")
+        print(f"Erro Telegram: {e}")
 
-# ================= LISTA DE ATIVOS =================
 TODOS_ATIVOS = [
     "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", 
     "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", 
@@ -59,11 +57,10 @@ def calcular_indicadores(df):
     df['MACD'] = exp12 - exp26
     df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
     df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
-    
     return df
 
 def monitorizar_mercado():
-    print("🤖 Bot Quotex 1M iniciado com sucesso na nuvem.")
+    print("Bot iniciado na nuvem.")
     enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado 24/7.")
     
     while True:
@@ -76,14 +73,12 @@ def monitorizar_mercado():
                 if isinstance(df.columns, pd.MultiIndex):
                     df.columns = df.columns.get_level_values(0)
                     
-                df = df.reset_index()
-                df = df.rename(columns={
+                df = df.reset_index().rename(columns={
                     'Open': 'open', 'High': 'high', 'Low': 'low', 
                     'Close': 'close', 'Volume': 'volume'
                 })
                 
                 df = calcular_indicadores(df)
-                
                 anterior = df.iloc[-2]
                 atual = df.iloc[-1]
                 
@@ -92,7 +87,6 @@ def monitorizar_mercado():
                 ema9 = float(anterior['EMA_9'])
                 ema21 = float(anterior['EMA_21'])
                 macd_hist = float(anterior['MACD_Hist'])
-                
                 preco_seguinte = float(atual['close'])
                 
                 nome_quotex = ticker.replace("-USD", "/USD").replace("=X", "")
@@ -101,48 +95,37 @@ def monitorizar_mercado():
                 
                 casas = 5 if "=X" in ticker else 2
 
-                # ================= LÓGICA DE ENTRADA =================
-                # COMPRA (CALL)
+                # Lógica de Compra
                 if rsi <= 46 and ema9 > ema21 and macd_hist > 0:
                     resultado = "✅ GREEN (WIN)" if preco_seguinte > preco else "❌ RED (LOSS)"
-                    
-                    mensagem = (
+                    msg = (
                         f"🟢 *ENTRADA PERFEITA - COMPRA (CALL)*\n\n"
                         f"📊 Ativo: `{nome_quotex}`\n"
-                        f"💵 Preço Entrada: `{preco:.{casas}f}`\n"
-                        f"📈 RSI: `{rsi:.1f}` | MACD Hist: `{macd_hist:.{casas}f}`\n"
-                        f"🏁 Resultado (Vela Seguinte): *{resultado}*"
+                        f"💵 Preço: `{preco:.{casas}f}`\n"
+                        f"📈 RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`\n"
+                        f"🏁 Resultado: *{resultado}*"
                     )
-                    enviar_telegram(mensagem)
-                    print(f"Sinal de COMPRA detetado em {nome_quotex} -> Enviado para o Telegram.")
+                    enviar_telegram(msg)
 
-                # VENDA (PUT)
+                # Lógica de Venda
                 elif rsi >= 54 and ema9 < ema21 and macd_hist < 0:
                     resultado = "✅ GREEN (WIN)" if preco_seguinte < preco else "❌ RED (LOSS)"
-                    
-                    mensagem = (
+                    msg = (
                         f"🔴 *ENTRADA PERFEITA - VENDA (PUT)*\n\n"
                         f"📊 Ativo: `{nome_quotex}`\n"
-                        f"💵 Preço Entrada: `{preco:.{casas}f}`\n"
-                        f"📉 RSI: `{rsi:.1f}` | MACD Hist: `{macd_hist:.{casas}f}`\n"
-                        f"🏁 Resultado (Vela Seguinte): *{resultado}*"
+                        f"💵 Preço: `{preco:.{casas}f}`\n"
+                        f"📉 RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`\n"
+                        f"🏁 Resultado: *{resultado}*"
                     )
-                    enviar_telegram(mensagem)
-                    print(f"Sinal de VENDA detetado em {nome_quotex} -> Enviado para o Telegram.")
+                    enviar_telegram(msg)
                 
                 time.sleep(1)
-                
             except Exception as e:
-                print(f"Erro ao analisar {ticker}: {e}")
                 continue
-        
         time.sleep(15)
 
 if __name__ == "__main__":
-    # Inicia o servidor Flask numa thread separada para o Render aceitar o deploy
     t = threading.Thread(target=run_flask)
     t.daemon = True
     t.start()
-    
-    # Inicia a rotina de monitorização do mercado
     monitorizar_mercado()
