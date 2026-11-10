@@ -16,130 +16,117 @@ def enviar_telegram(mensagem):
         "parse_mode": "Markdown"
     }
     try:
-        requests.post(url, json=payload, timeout=10)
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            print("Mensagem enviada com sucesso para o Telegram!")
+        else:
+            print(f"Erro ao enviar para o Telegram: {response.text}")
     except Exception as e:
-        print(f"Erro ao enviar mensagem: {e}")
+        print(f"Exceção ao enviar mensagem: {e}")
 
 # ================= LISTA DE ATIVOS =================
-PARES = [
+TODOS_ATIVOS = [
     "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", 
-    "USDCHF=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X",
-    "AUDJPY=X", "EURAUD=X", "EURNZD=X", "GBPAUD=X", "GBPNZD=X",
-    "CHFJPY=X", "CADJPY=X", "AUDNZD=X", "BTC-USD", "ETH-USD"
+    "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X", "AUDJPY=X", 
+    "CHFJPY=X", "EURCHF=X", "AUDCAD=X", "EURAUD=X", "GBPCAD=X",
+    "BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD"
 ]
 
 def calcular_indicadores(df):
-    # EMA 9 e EMA 21
-    df['EMA9'] = df['Close'].ewm(span=9, adjust=False).mean()
-    df['EMA21'] = df['Close'].ewm(span=21, adjust=False).mean()
+    df['EMA_9'] = df['close'].ewm(span=9, adjust=False).mean()
+    df['EMA_21'] = df['close'].ewm(span=21, adjust=False).mean()
     
-    # RSI (14)
-    delta = df['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
+    delta = df['close'].diff()
+    ganho = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    perda = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = ganho / perda
     df['RSI'] = 100 - (100 / (1 + rs))
     
-    # MACD Histograma
-    exp1 = df['Close'].ewm(span=12, adjust=False).mean()
-    exp2 = df['Close'].ewm(span=26, adjust=False).mean()
-    df['MACD'] = exp1 - exp2
+    exp12 = df['close'].ewm(span=12, adjust=False).mean()
+    exp26 = df['close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = exp12 - exp26
     df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
     df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
     
     return df
 
 def monitorizar_mercado():
-    enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado com validação automática de Win/Loss.")
+    print("🤖 Bot Quotex 1M iniciado com sucesso na nuvem.")
+    enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado em tempo real.")
     
     while True:
-        for par in PARES:
+        for ticker in TODOS_ATIVOS:
             try:
-                # Descarregar dados de 1 minuto
-                dados = yf.download(par, period="1d", interval="1m", progress=False)
-                
-                if dados.empty or len(dados) < 30:
+                df = yf.download(ticker, period="1d", interval="1m", progress=False)
+                if df.empty or len(df) < 35:
                     continue
                 
-                # Tratar multi-index do yfinance se houver
-                if isinstance(dados.columns, pd.MultiIndex):
-                    dados.columns = dados.columns.get_level_values(0)
+                if isinstance(df.columns, pd.MultiIndex):
+                    df.columns = df.columns.get_level_values(0)
+                    
+                df = df.reset_index()
+                df = df.rename(columns={
+                    'Open': 'open', 'High': 'high', 'Low': 'low', 
+                    'Close': 'close', 'Volume': 'volume'
+                })
                 
-                df = calcular_indicadores(dados)
+                df = calcular_indicadores(df)
                 
-                # Pegar na última vela fechada (penúltima linha, pois a última está a abrir)
-                atual = df.iloc[-2]
+                # Analisamos a penúltima vela (fechada) e a última (para validar resultado)
+                anterior = df.iloc[-2]
+                atual = df.iloc[-1]
                 
-                preco = float(atual['Close'])
-                rsi = float(atual['RSI'])
-                ema9 = float(atual['EMA9'])
-                ema21 = float(atual['EMA21'])
-                macd_hist = float(atual['MACD_Hist'])
+                preco = float(anterior['close'])
+                rsi = float(anterior['RSI'])
+                ema9 = float(anterior['EMA_9'])
+                ema21 = float(anterior['EMA_21'])
+                macd_hist = float(anterior['MACD_Hist'])
                 
-                nome_ativo = par.replace("=X", "").replace("-USD", "/USD")
+                preco_seguinte = float(atual['close'])
                 
-                # ================= LÓGICA DE ENTRADA =================
-                # SINAL DE COMPRA (CALL): RSI < 35, EMA9 > EMA21 e MACD Histograma > 0
-                if rsi < 35 and ema9 > ema21 and macd_hist > 0:
+                nome_quotex = ticker.replace("-USD", "/USD").replace("=X", "")
+                if len(nome_quotex) == 6 and "/" not in nome_quotex:
+                    nome_quotex = nome_quotex[:3] + "/" + nome_quotex[3:]
+                
+                casas = 5 if "=X" in ticker else 2
+
+                # ================= LÓGICA DE ENTRADA (Igual ao Painel) =================
+                # COMPRA (CALL)
+                if rsi <= 46 and ema9 > ema21 and macd_hist > 0:
+                    resultado = "✅ GREEN (WIN)" if preco_seguinte > preco else "❌ RED (LOSS)"
+                    
                     mensagem = (
                         f"🟢 *ENTRADA PERFEITA - COMPRA (CALL)*\n\n"
-                        f"📊 Ativo: `{nome_ativo}`\n"
-                        f"💵 Preço de Entrada: `$ {preco:.5f}`\n"
-                        f"📈 RSI: `{rsi:.2f}` | Hist. MACD: `{macd_hist:.5f}`\n"
-                        f"⏳ *Aguardando resultado da vela seguinte...*"
+                        f"📊 Ativo: `{nome_quotex}`\n"
+                        f"💵 Preço Entrada: `{preco:.{casas}f}`\n"
+                        f"📈 RSI: `{rsi:.1f}` | MACD Hist: `{macd_hist:.{casas}f}`\n"
+                        f"🏁 Resultado (Vela Seguintel): *{resultado}*"
                     )
                     enviar_telegram(mensagem)
-                    
-                    # Esperar 65 segundos para a vela seguinte fechar e validar
-                    time.sleep(65)
-                    
-                    # Verificar preço após 1 minuto
-                    dados_pos = yf.download(par, period="1d", interval="1m", progress=False)
-                    if isinstance(dados_pos.columns, pd.MultiIndex):
-                        dados_pos.columns = dados_pos.columns.get_level_values(0)
-                    
-                    preco_final = float(dados_pos.iloc[-2]['Close'])
-                    
-                    if preco_final > preco:
-                        enviar_telegram(f"✅ *RESULTADO: WIN (GREEN)* em `{nome_ativo}`!\nEntrada: `{preco:.5f}` -> Fecho: `{preco_final:.5f}`")
-                    else:
-                        enviar_telegram(f"❌ *RESULTADO: LOSS (RED)* em `{nome_ativo}`\nEntrada: `{preco:.5f}` -> Fecho: `{preco_final:.5f}`")
+                    print(f"Sinal de COMPRA detetado em {nome_quotex} -> Enviado para o Telegram.")
 
-                # SINAL DE VENDA (PUT): RSI > 65, EMA9 < EMA21 e MACD Histograma < 0
-                elif rsi > 65 and ema9 < ema21 and macd_hist < 0:
+                # VENDA (PUT)
+                elif rsi >= 54 and ema9 < ema21 and macd_hist < 0:
+                    resultado = "✅ GREEN (WIN)" if preco_seguinte < preco else "❌ RED (LOSS)"
+                    
                     mensagem = (
                         f"🔴 *ENTRADA PERFEITA - VENDA (PUT)*\n\n"
-                        f"📊 Ativo: `{nome_ativo}`\n"
-                        f"💵 Preço de Entrada: `$ {preco:.5f}`\n"
-                        f"📉 RSI: `{rsi:.2f}` | Hist. MACD: `{macd_hist:.5f}`\n"
-                        f"⏳ *Aguardando resultado da vela seguinte...*"
+                        f"📊 Ativo: `{nome_quotex}`\n"
+                        f"💵 Preço Entrada: `{preco:.{casas}f}`\n"
+                        f"📉 RSI: `{rsi:.1f}` | MACD Hist: `{macd_hist:.{casas}f}`\n"
+                        f"🏁 Resultado (Vela Seguinte): *{resultado}*"
                     )
                     enviar_telegram(mensagem)
-                    
-                    # Esperar 65 segundos para a vela seguinte fechar e validar
-                    time.sleep(65)
-                    
-                    # Verificar preço após 1 minuto
-                    dados_pos = yf.download(par, period="1d", interval="1m", progress=False)
-                    if isinstance(dados_pos.columns, pd.MultiIndex):
-                        dados_pos.columns = dados_pos.columns.get_level_values(0)
-                    
-                    preco_final = float(dados_pos.iloc[-2]['Close'])
-                    
-                    if preco_final < preco:
-                        enviar_telegram(f"✅ *RESULTADO: WIN (GREEN)* em `{nome_ativo}`!\nEntrada: `{preco:.5f}` -> Fecho: `{preco_final:.5f}`")
-                    else:
-                        enviar_telegram(f"❌ *RESULTADO: LOSS (RED)* em `{nome_ativo}`\nEntrada: `{preco:.5f}` -> Fecho: `{preco_final:.5f}`")
+                    print(f"Sinal de VENDA detetado em {nome_quotex} -> Enviado para o Telegram.")
                 
-                # Pausa pequena entre ativos para não sobrecarregar a API
-                time.sleep(2)
+                time.sleep(1)
                 
             except Exception as e:
-                print(f"Erro ao analisar {par}: {e}")
+                print(f"Erro ao analisar {ticker}: {e}")
                 continue
         
-        # Pausa antes de reiniciar a varredura completa do mercado
-        time.sleep(10)
+        # Pausa antes da próxima ronda de varredura completa
+        time.sleep(15)
 
 if __name__ == "__main__":
     monitorizar_mercado()
