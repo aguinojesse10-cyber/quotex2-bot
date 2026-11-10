@@ -7,19 +7,18 @@ import pandas as pd
 import numpy as np
 from flask import Flask
 
-# Servidor Flask básico para o Render detetar o serviço web
+# 1. Servidor Flask (para manter o Render acordado)
 app = Flask(__name__)
 
 @app.route('/')
 def home():
     return "Bot Quotex 1M Online!"
 
-def run_flask():
-    # O Render atribui dinamicamente a porta através de os.environ.get('PORT')
+def correr_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Credenciais do Telegram
+# 2. Credenciais do Telegram
 TOKEN = "7950796339:AAESd5H2HlJmFfS5X2w4p7k1L8m9N0v3Q2w"
 CHAT_ID = "6172559092"
 
@@ -59,6 +58,7 @@ def calcular_indicadores(df):
     df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
     return df
 
+# 3. Rotina Principal do Bot
 def monitorizar_mercado():
     print("Bot iniciado na nuvem.")
     enviar_telegram("🤖 *Bot Quotex 1M Online!* A monitorizar o mercado 24/7.")
@@ -125,7 +125,10 @@ def monitorizar_mercado():
         time.sleep(15)
 
 if __name__ == "__main__":
-    t = threading.Thread(target=run_flask)
-    t.daemon = True
-    t.start()
+    # Inicia o Flask numa thread em segundo plano para não bloquear o bot
+    t_flask = threading.Thread(target=correr_flask)
+    t_flask.daemon = True
+    t_flask.start()
+    
+    # Inicia imediatamente a monitorização e o envio de mensagens
     monitorizar_mercado()
