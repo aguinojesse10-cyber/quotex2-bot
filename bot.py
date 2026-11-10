@@ -18,8 +18,8 @@ def correr_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Credenciais do Telegram atualizadas e válidas
-TOKEN = "9253894531:AAFptMPB8c6Yk5tNbdMxPczOw9bkdix0wso"
+# Credenciais do Telegram atualizadas
+TOKEN = "9160642609:AAETghLIx8PbcWOe7YfSFe411MKmcYIABcY"
 CHAT_ID = "6172559092"
 
 def enviar_telegram(mensagem):
@@ -90,45 +90,4 @@ def monitorizar_mercado():
                 preco_seguinte = float(atual['close'])
                 
                 nome_quotex = ticker.replace("-USD", "/USD").replace("=X", "")
-                if len(nome_quotex) == 6 and "/" not in nome_quotex:
-                    nome_quotex = nome_quotex[:3] + "/" + nome_quotex[3:]
-                
-                casas = 5 if "=X" in ticker else 2
-
-                # Lógica de Compra
-                if rsi <= 46 and ema9 > ema21 and macd_hist > 0:
-                    resultado = "✅ GREEN (WIN)" if preco_seguinte > preco else "❌ RED (LOSS)"
-                    msg = (
-                        f"🟢 *ENTRADA PERFEITA - COMPRA (CALL)*\n\n"
-                        f"📊 Ativo: `{nome_quotex}`\n"
-                        f"💵 Preço: `{preco:.{casas}f}`\n"
-                        f"📈 RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`\n"
-                        f"🏁 Resultado: *{resultado}*"
-                    )
-                    enviar_telegram(msg)
-
-                # Lógica de Venda
-                elif rsi >= 54 and ema9 < ema21 and macd_hist < 0:
-                    resultado = "✅ GREEN (WIN)" if preco_seguinte < preco else "❌ RED (LOSS)"
-                    msg = (
-                        f"🔴 *ENTRADA PERFEITA - VENDA (PUT)*\n\n"
-                        f"📊 Ativo: `{nome_quotex}`\n"
-                        f"💵 Preço: `{preco:.{casas}f}`\n"
-                        f"📉 RSI: `{rsi:.1f}` | MACD: `{macd_hist:.{casas}f}`\n"
-                        f"🏁 Resultado: *{resultado}*"
-                    )
-                    enviar_telegram(msg)
-                
-                time.sleep(1)
-            except Exception as e:
-                print(f"Erro ao analisar {ticker}: {e}", flush=True)
-                continue
-        time.sleep(15)
-
-if __name__ == "__main__":
-    t_flask = threading.Thread(target=correr_flask)
-    t_flask.daemon = True
-    t_flask.start()
-    
-    monitorizar_mercado()
-    
+                if len(nome_quotex) == 6 and
